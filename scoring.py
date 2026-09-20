@@ -6,14 +6,14 @@ class Scorer:
         self.translator = translator     
         self.history = []   # pair of (knobs_setting, score)
         
-    def __call__(self, knobs_setting):
+    def __call__(self, knobs_settings):
 
-        knobs_setting = self.check_settings(knobs_setting)
+        knobs_settings = self.check_settings(knobs_settings)
 
-        message = self.translator.translate(knobs_setting)
+        message = self.translator.translate(knobs_settings)
         score = decode(message)
 
-        self.history.append((knobs_setting, score))
+        self.history.append((knobs_settings, score))
 
         return score
     
@@ -53,15 +53,11 @@ class Scorer:
         return our_copy
 
 def decode(message):
-
     words = message.split()
     translated_count = 0
 
     for word in words:
-
         if word.isdigit():           # all digits = still an alien code
             continue
-
         translated_count = translated_count + 1
-
     return translated_count / len(words)
