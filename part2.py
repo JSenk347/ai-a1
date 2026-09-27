@@ -7,13 +7,14 @@ from scoring import Scorer
 def main():
     translator = UniversalTranslator(n_dim=10)
     scorer = Scorer(translator)
-    searcher = Searcher(10, 1000, 0.1, scorer)
+    searcher = Searcher(10, 15000, 0.1, scorer)
 
     start_settings = np.full(10, 0.5)
 
     start_time = time.perf_counter()
 
-    best_settings, best_score = searcher(start_settings)
+    best_settings, best_score = searcher()
+    print(best_score)
 
     end_time= time.perf_counter()  
     full_time = end_time - start_time

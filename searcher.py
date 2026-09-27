@@ -128,6 +128,7 @@ class Searcher:
 
         if tied:
             self.curr_best_pos = tied[np.random.randint(len(tied))]
+            print(f"found a better score, stepping from {self.curr_score} -> {best_score}")
             self.curr_score = best_score
         else:
             self.curr_best_pos = self.curr       # local optimum at this resolution
