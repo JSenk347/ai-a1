@@ -7,6 +7,8 @@ LOWER_BND = 0
 
 class Searcher:
 
+    # need to validate init args
+
     def __init__(self, n_dim: int, stop_limit: int, step_size: float):
         self.scorer = Scorer(UniversalTranslator(n_dim=n_dim))
         self.n_dim = n_dim             # number of knobs: 2 or 10
@@ -23,12 +25,6 @@ class Searcher:
         self.seen_scores = []
 
         self.curr_best_pos = np.full(n_dim, np.nan)
-
-        # scored_points is every point we have paid to score, in the order scored: row i of scored_points has score scores[i].
-        # Preallocated because we can never score more than stop_limit points; rows num_evals onward are still nan.
-        # self.scored_points = np.full((stop_limit, n_dim), np.nan)
-        # self.scores = np.full(stop_limit, np.nan)
-        # cannot use dictionary because np arrays are not hashable, and so knob arrays cannot be dict keys.
 
     def __call__(self, starting_settings: np.ndarray):
         if not self.has_searched:
