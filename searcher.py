@@ -121,8 +121,8 @@ class Searcher:
 
 
 if __name__ == "__main__":
-    searcher = Searcher(10, 1000, 0.1)
-    print(searcher(np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5])))
+    searcher = Searcher(2, 100, 0.1)
+    print(searcher(np.array([.5, .5])))
 
 
 
