@@ -103,7 +103,7 @@ class Searcher:
 
             if score >= best_score: # = is very important so that even if we don't have any better options, at least we are moving
                 self.curr_best_pos = pos
-                print(f"found better score {best_score} -> {score} at {pos}")
+                print(f"found better score {best_score:.4f} -> {score:.4f} at {pos}")
                 best_score = score
 
                 
