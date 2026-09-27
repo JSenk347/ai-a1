@@ -126,7 +126,10 @@ class Searcher:
 
 
 if __name__ == "__main__":
-    searcher = Searcher(10, 1000, 0.1)
+    translator = UniversalTranslator(n_dim=10)
+    scorer = Scorer(translator)
+
+    searcher = Searcher(n_dim=10, stop_limit=1000, step_size=0.1, scorer=scorer)
     print(searcher(np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5])))
 
     
