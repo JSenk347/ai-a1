@@ -1,7 +1,12 @@
+import numpy as np
 from translator import UniversalTranslator
 from scoring import Scorer
 
+UPPER_BND = 1
+LOWER_BND = 0
+
 class Searcher:
+
     '''
     A searcher class that utilizes the hill-climbing search algorithm to find the
     knob settings that yield the highest translation score.
@@ -20,163 +25,108 @@ class Searcher:
         if isinstance(stop_limit, bool) or not isinstance(stop_limit, int):
             raise ValueError(f"stop_limit must be an integer, got {stop_limit}")
 
-        # 1 eval for start point, plus one full round of single-knob neighbours
-        # (2 per knob: +step and -step)
-        min_limit = 1 + 2 * n_dim
-        if stop_limit < min_limit:
-            raise ValueError(
-                f"stop_limit={stop_limit} is too small for {n_dim} knobs: "
-                f"need at least {min_limit} (1 start + {2 * n_dim} neighbours)"
-            )  
-
-    def __init__(self, n_dim: int, stop_limit: int, step_size: int):
+    def __init__(self, n_dim: int, stop_limit: int, step_size: float):
         self._validate(n_dim, stop_limit, step_size)
 
         self.scorer = Scorer(UniversalTranslator(n_dim=n_dim))
-        self.curr = ()
-        self.curr_score = None
-        self.frontier = set()          # neighbours of curr still worth considering
-        self.seen = set()              # every place we have stood on, i.e. once been curr
-        self.scores = {}               # every point we have paid to score: {settings tuple: score}
-        self.stop_limit = stop_limit
-        self.step_size = step_size
-        self.num_evals = 0
+        self.n_dim = n_dim             # number of knobs: 2 or 10
+        self.stop_limit = stop_limit   # max number of times we can call self.scorer
+        self.step_size = step_size     # how far one move changes a knob, in (0, 1)
+        self.num_evals = 0             # number of scorer calls so far
+        self.has_searched = False
 
-    def __call__(self, start_settings):
+        self.curr = np.full(n_dim, np.nan)      # shape (n_dim,): knob values of the point we are standing on
+        self.curr_score = np.nan                # score of curr; nan until curr has been scored
+
+        self.frontier = np.empty((0, n_dim))    # shape (k, n_dim): neighbours of curr still worth considering, one per row
+        self.seen = np.empty((0, n_dim))        # shape (m, n_dim): every point we have stood on, one per row
+        self.seen_scores = []
+
+        self.curr_best_pos = np.full(n_dim, np.nan)
+
+    def __call__(self, starting_settings: np.ndarray):
+        if not self.has_searched:
+            self.validate_start(starting_settings)
+            self.curr = starting_settings
+            self.seen = np.vstack((self.seen, starting_settings)) # add starting settings to the array of settings we've been to
+            
+            while self.num_evals <= self.stop_limit:
+                self.expand_frontier()
+                self.examine_frontier()
+                self.take_step()
+
+            self.has_searched = True
+  
+            return self.curr, self.scorer.best()[1]
+        else:
+            raise LookupError("A searcher can only climb one hill. Create another searcher to climb another hill.")
+
+
+    def expand_frontier(self):
         '''
-        This function utilizes the hill-climbing search algorithm to 
-        find the best knob setting for the receiver, using Joseph's 
-        Scorer to determine which settings provide the steepest incline.
+        Expands the frontier from our self.curr position by creating a step_matrix (identify matrix multiplied by
+        step size scalar) and adding/subtracting our current knob settings to each row of the step_matrix, then stacking
+        those two matrices on the self.frontier stack of matrices. Element values are bound in [0, 1] with np.clip(),
+        and deduped with np.unique() (which sorts the knob setting arrays in asc order).
+
         Args:
-            start: the starting knob positions
+            self: searcher object
         Returns:
-            The optimal knob settings for the receiver.
+            none
         '''
-        self.curr = to_key(start_settings)
-        self.curr_score = self._evaluate(self.curr)
+        self.frontier = np.empty((0, self.n_dim))
+        step_matrix = np.eye(self.n_dim) * self.step_size # creates identity matrix with diagonal value of step_size
 
-        while True:
-            self.seen.add(self.curr)
-            self.expand()
-            if not self.frontier:      # every neighbour is somewhere we've already stood
-                break
+        # add/subtract curr knob position to each row of identify matrix
+        # clipping element values to be within bounds with np.clip
+        incr_frontier = np.clip((self.curr + step_matrix), a_min=LOWER_BND, a_max=UPPER_BND)
+        decr_frontier = np.clip((self.curr - step_matrix), a_min=LOWER_BND, a_max=UPPER_BND)
 
-            # look at every neighbour and remember the highest-scoring one
-            best_neighbour = None
-            best_score = float("-inf")
-            budget_left = True
-            for setting in sorted(self.frontier):    # sorted: ties break the same way every run
-                if setting not in self.scores and self.num_evals >= self.stop_limit:
-                    budget_left = False              # check BEFORE every scorer call
-                    break
-                score = self._evaluate(setting)
-                if score > best_score:
-                    best_neighbour = setting 
-                    best_score = score
+        self.frontier = np.vstack((self.frontier, incr_frontier, decr_frontier)) # "vertically stacks" arrays to self.frontier
+        self.frontier = np.unique(self.frontier, axis=0) # axis=0 means it looks for duplicate ROWS. SORTS self.frontier
 
-            # take the step only if it is strictly uphill
-            if best_neighbour != None and best_score > self.curr_score:
-                improved = best_neighbour
-                self.curr = best_neighbour
-                self.curr_score = best_score
-
-            # no uphill neighbour = local maximum (a plateau also stops us), or out of budget
-            if not improved or not budget_left:
-                break
-
-        return self.best()
-
-    def _evaluate(self, point):
+    def examine_frontier(self):
         '''
-        Scores a point, paying for it (one scorer call) only the first time we see it.
+        Scores every array of knob settings in self.frontier and updates self.curr_best_pos with the pos that
+        provided the best score
         '''
-        if point not in self.scores:
-            self.scores[point] = self.scorer(point)
+        self.curr_score = self.scorer(self.curr)
+        best_score = self.curr_score
+        self.curr_best_pos = self.curr
+
+        self.num_evals += 1
+        
+        for pos in self.frontier:
+            score = self.scorer(pos)
+            self.seen_scores.append(score)
             self.num_evals += 1
-        return self.scores[point]
 
-    def expand(self):
-        # a set: order doesn't matter, and duplicates (e.g. from clipping) vanish for free
-        self.frontier = set()
-        self.frontier.update(single_steps(self.curr, self.step_size))
-        #self.frontier.extend(sweeping_steps(self.curr, self.step_size, direction=+1))
-        #self.frontier.extend(sweeping_steps(self.curr, self.step_size, direction=-1))
+            if score >= best_score: # = is very important so that even if we don't have any better options, at least we are moving
+                self.curr_best_pos = pos
+                print(f"found better score {best_score} -> {score} at {pos}")
+                best_score = score
 
-        # never step back onto a place we've already stood on (this also stops loops)
-        self.frontier.difference_update(self.seen)
-
-    def best(self):
-        '''
-        Returns the best scored (knob settings, score) pair, in the same format
-        as Scorer.best(): a list of settings and its score. If several
-        settings tie, the one scored first wins.
-        '''
-        if not self.scores:
-            raise ValueError("no settings have been scored yet")
-        best_settings = max(self.scores, key=self.scores.get)
-        return list(best_settings), self.scores[best_settings]
+                
+    def take_step(self):
+        self.curr = self.curr_best_pos
+        self.seen = np.vstack((self.seen, self.curr))
 
 
-def clip(value):
-    '''
-    Keeps a knob value inside the legal range [0, 1]. Joseph's Scorer raises a
-    ValueError for anything outside it.
-    '''
-    return min(1.0, max(0.0, value))
-
-def to_key(point):
-    '''
-    Turns a list/tuple of knob values into a hashable tuple so it can live in a set.
-    Rounding makes 0.30000000000000004 and 0.3 count as the same point.
-    '''
-    return tuple(round(v, 10) for v in point)
-
-# curr is a tuple of knob values, with 2 or 10 elements (knobs)
-def single_steps(curr, step_size):
-    '''
-    Returns a list of tuples: curr with one knob moved up or down by step_size.
-    '''
-    neigbs = []
-
-    for i, knob in enumerate(curr):
-        incr = list(curr)
-        incr[i] = clip(knob + step_size)
-        neigbs.append(to_key(incr))
-
-        decr = list(curr)
-        decr[i] = clip(knob - step_size)
-        neigbs.append(to_key(decr))
-
-    return neigbs
-
-def sweeping_steps(curr, step_size, direction):
-    """
-    Walk step_size in `direction` (+1 or -1) across knobs left to right,
-    then partially walk back in the opposite direction over all but the
-    last two knobs.
-
-    e.g. direction=+1, curr=[.5, .5, .5]:
-        [.5,.5,.5] -> [.6,.6,.5] -> [.6,.6,.6] -> [.5,.6,.6]
-    (the starting state is skipped — _perturb_single_knobs already covers it)
-    """
-    neighbours = []
-
-    primed = list(curr)
-    primed[0] = clip(primed[0] + direction * step_size)
-    for i in range(1, len(primed)):
-        primed[i] = clip(primed[i] + direction * step_size)
-        neighbours.append(to_key(primed))
-
-    reversed_primed = list(primed)
-    for i in range(0, len(reversed_primed) - 2):
-        reversed_primed[i] = clip(reversed_primed[i] - direction * step_size)
-        neighbours.append(to_key(reversed_primed))
-
-    return neighbours
-
+    def validate_start(self, start_pos: np.ndarray):
+        if start_pos.shape != (self.n_dim,):
+            raise ValueError(f"starting settings must have shape ({self.n_dim}, ), but {start_pos} has shape {start_pos.shape}")
+        for knob in start_pos:
+            if knob < 0 or knob > 1:
+                raise ValueError(f"knob settings must be bound by [0, 1], got {start_pos}.")
 
 
 if __name__ == "__main__":
-    # hangs if stop_limit > 13. idk why
-    searcher = Searcher(n_dim=2, stop_limit=13, step_size=0.1)
-    print(searcher((0.5, 0.5)))
+    searcher = Searcher(10, 1000, 0.1)
+    print(searcher(np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5])))
+
+
+
+
+        
+
+         
