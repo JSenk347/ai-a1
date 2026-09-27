@@ -25,10 +25,10 @@ class Searcher:
         if isinstance(stop_limit, bool) or not isinstance(stop_limit, int):
             raise ValueError(f"stop_limit must be an integer, got {stop_limit}")
 
-    def __init__(self, n_dim: int, stop_limit: int, step_size: float):
+    def __init__(self, n_dim: int, stop_limit: int, step_size: float, scorer: Scorer):
         self._validate(n_dim, stop_limit, step_size)
-
-        self.scorer = Scorer(UniversalTranslator(n_dim=n_dim))
+        
+        self.scorer = scorer
         self.n_dim = n_dim             # number of knobs: 2 or 10
         self.stop_limit = stop_limit   # max number of times we can call self.scorer
         self.step_size = step_size     # how far one move changes a knob, in (0, 1)
@@ -121,8 +121,8 @@ class Searcher:
 
 
 if __name__ == "__main__":
-    searcher = Searcher(2, 100, 0.1)
-    print(searcher(np.array([.5, .5])))
+    searcher = Searcher(10, 1000, 0.1)
+    print(searcher(np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5])))
 
 
 
