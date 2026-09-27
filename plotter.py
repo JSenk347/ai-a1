@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
 
 def generate_search_plot(history_list):
     x_values, y_values, scores = [], [], []
@@ -12,9 +11,6 @@ def generate_search_plot(history_list):
 
     # create a scatter plot of the knob settings and their corresponding scores
     plt.scatter(x_values, y_values, c=scores, vmin=0, vmax=1)
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.grid(True)
 
     # add a color bar to indicate the score values
     plt.colorbar(label='Decode Rate')

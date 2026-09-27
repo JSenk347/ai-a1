@@ -49,10 +49,10 @@ class Scorer:
             )
 
         for knob_number, value in enumerate(our_copy):
-            if math.isnan(value):
-                raise ValueError(
-                    f"knob {knob_number} is not a number"
-                )
+            # if math.isnan(value):
+            #     raise ValueError(
+            #         f"knob {knob_number} is not a number"
+            #     )
 
             if value < 0 or value > 1:
                 raise ValueError(

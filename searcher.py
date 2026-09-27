@@ -4,6 +4,7 @@ from scoring import Scorer
 
 UPPER_BND = 1
 LOWER_BND = 0
+MIN_STEP = 0.005
 
 class Searcher:
 
@@ -27,12 +28,15 @@ class Searcher:
 
     def __init__(self, n_dim: int, stop_limit: int, step_size: float, scorer: Scorer):
         self._validate(n_dim, stop_limit, step_size)
+        if scorer.translator.n_dim != n_dim:
+            raise ValueError(f"searcher n_dim={n_dim} but translator n_dim={scorer.translator.n_dim}")
         
         self.scorer = scorer
         self.n_dim = n_dim             # number of knobs: 2 or 10
         self.stop_limit = stop_limit   # max number of times we can call self.scorer
-        self.step_size = step_size     # how far one move changes a knob, in (0, 1)
-        self.num_evals = 0             # number of scorer calls so far
+        self.init_step = step_size     # step size each new climb starts with
+        self.step_size = step_size     # current step size
+        self.num_evals = 0             # number of scorer calls made so far
         self.has_searched = False
 
         self.curr = np.full(n_dim, np.nan)      # shape (n_dim,): knob values of the point we are standing on
@@ -45,93 +49,105 @@ class Searcher:
 
         self.curr_best_pos = np.full(n_dim, np.nan)
 
-        self.path_history = [] # tracker for pos, score pairs for each step in the searcher. This is used for plotting the path taken by the searcher.
+        self.best_pos = np.full(n_dim, np.nan) # best point found across all climbs
+        self.best_score = -np.inf
 
-    def __call__(self, starting_settings: np.ndarray):
-        if not self.has_searched:
-            self.validate_start(starting_settings)
-            self.curr = starting_settings
-            self.seen = np.vstack((self.seen, starting_settings)) # add starting settings to the array of settings we've been to
-            
-            while self.num_evals <= self.stop_limit:
+    def __call__(self):
+        if self.has_searched:
+            raise LookupError("A searcher can only search once. Create another searcher")
+        
+        
+        while self.num_evals < self.stop_limit:
+            if not self.calibrate():
+                break
+            while self.step_size >= MIN_STEP and self.num_evals < self.stop_limit:
                 self.expand_frontier()
-                self.examine_frontier()
+                if not self.examine_frontier():
+                    break
                 self.take_step()
 
-            self.seen_scores.append(self.scorer.best()[1])
+        self.has_searched = True
+        return self.best_pos, self.best_score
 
-            self.has_searched = True
-  
-            return self.curr, self.seen_scores[-1]
-        else:
-            raise LookupError("A searcher can only climb one hill. Create another searcher to climb another hill.")
+    def _score(self, pos):
+        '''
+        Scores pos, updating the eval count and gloabl best. Returns None if out of budget.
+        '''
+        if self.num_evals >= self.stop_limit:
+            return None
+        score = self.scorer(pos)
+        self.num_evals += 1
+        if score > self.best_score:
+            self.best_score, self.best_pos = score, np.array(pos, dtype=float)
+        return score
+        
+    def calibrate(self):
+        '''
+        Random restart: sample uniformly until a point scores > 0, then stand on it.
+        Returns False if the budget runs out first.
+        '''
+        while True:
+            candidate = np.random.uniform(LOWER_BND, UPPER_BND, self.n_dim)
+            score = self._score(candidate)
+            if score is None:
+                return False
+            if score > 0:
+                self.curr, self.curr_score = candidate, score
+                self.step_size = self.init_step
+                self.seen = np.vstack((self.seen, self.curr))
+                self.seen_scores.append(self.curr_score)
+                return True
 
 
     def expand_frontier(self):
-        '''
-        Expands the frontier from our self.curr position by creating a step_matrix (identify matrix multiplied by
-        step size scalar) and adding/subtracting our current knob settings to each row of the step_matrix, then stacking
-        those two matrices on the self.frontier stack of matrices. Element values are bound in [0, 1] with np.clip(),
-        and deduped with np.unique() (which sorts the knob setting arrays in asc order).
-
-        Args:
-            self: searcher object
-        Returns:
-            none
-        '''
-        self.frontier = np.empty((0, self.n_dim))
-        step_matrix = np.eye(self.n_dim) * self.step_size # creates identity matrix with diagonal value of step_size
-
-        # add/subtract curr knob position to each row of identify matrix
-        # clipping element values to be within bounds with np.clip
-        incr_frontier = np.clip((self.curr + step_matrix), a_min=LOWER_BND, a_max=UPPER_BND)
-        decr_frontier = np.clip((self.curr - step_matrix), a_min=LOWER_BND, a_max=UPPER_BND)
-
-        self.frontier = np.vstack((self.frontier, incr_frontier, decr_frontier)) # "vertically stacks" arrays to self.frontier
-        self.frontier = np.unique(self.frontier, axis=0) # axis=0 means it looks for duplicate ROWS. SORTS self.frontier
+        '''+/- step_size on each knob (2*n_dim neighbours), clipped to [0, 1], deduped.'''
+        step_matrix = np.eye(self.n_dim) * self.step_size
+        incr = np.clip(self.curr + step_matrix, LOWER_BND, UPPER_BND)
+        decr = np.clip(self.curr - step_matrix, LOWER_BND, UPPER_BND)
+        self.frontier = np.unique(np.vstack((incr, decr)), axis=0)
+        # drop rows identical to curr (happens when curr is on a boundary)
+        self.frontier = self.frontier[~np.all(self.frontier == self.curr, axis=1)]
 
     def examine_frontier(self):
         '''
-        Scores every array of knob settings in self.frontier and updates self.curr_best_pos with the pos that
-        provided the best score
+        Scores every neighbour. curr_score is already known, so curr is NOT re-scored.
+        Only a STRICTLY better neighbour is a move; ties among the best improving
+        neighbours are broken at random. No improvement -> halve step_size.
+        Returns False if the budget ran out.
         '''
-        self.curr_score = self.scorer(self.curr)
-
-        self.path_history.append((self.curr.copy(), self.curr_score)) # record the current pos and score we are currently in
-
         best_score = self.curr_score
-        self.curr_best_pos = self.curr
-
-        self.num_evals += 1
-        
+        tied = []
         for pos in self.frontier:
-            score = self.scorer(pos)
-            self.seen_scores.append(score)
-            self.num_evals += 1
+            score = self._score(pos)
+            if score is None:
+                return False
+            if score > best_score:
+                best_score, tied = score, [pos]
+            elif score == best_score and tied:   # tie with an improving neighbour, not with curr
+                tied.append(pos)
 
-            if score >= best_score: # = is very important so that even if we don't have any better options, at least we are moving
-                self.curr_best_pos = pos
-                print(f"found better score {best_score:.4f} -> {score:.4f} at {pos}")
-                best_score = score
+        if tied:
+            self.curr_best_pos = tied[np.random.randint(len(tied))]
+            self.curr_score = best_score
+        else:
+            self.curr_best_pos = self.curr       # local optimum at this resolution
+            self.step_size /= 2                  # zoom in
+        return True
 
                 
     def take_step(self):
-        self.curr = self.curr_best_pos
-        self.seen = np.vstack((self.seen, self.curr))
-
-
-    def validate_start(self, start_pos: np.ndarray):
-        if start_pos.shape != (self.n_dim,):
-            raise ValueError(f"starting settings must have shape ({self.n_dim}, ), but {start_pos} has shape {start_pos.shape}")
-        for knob in start_pos:
-            if knob < 0 or knob > 1:
-                raise ValueError(f"knob settings must be bound by [0, 1], got {start_pos}.")
+        if not np.array_equal(self.curr_best_pos, self.curr):
+            self.curr = self.curr_best_pos
+            self.seen = np.vstack((self.seen, self.curr))
+            self.seen_scores.append(self.curr_score)
 
 
 if __name__ == "__main__":
-    translator = UniversalTranslator(n_dim=2)
+    N_DIM = 10
+    translator = UniversalTranslator(n_dim=N_DIM)
     scorer = Scorer(translator)
-    searcher = Searcher(2, 1000, 0.1, scorer)
-    print(searcher(np.array([.5, .5])))
-
-    
+    searcher = Searcher(N_DIM, 3000, 0.1, scorer)
+    best_pos, best_score = searcher()
+    print(f"best settings: {np.round(best_pos, 3)}")
+    print(f"best decode rate: {best_score:.4f}")
+    print(f"settings tried: {translator.n_settings_tried()}")
