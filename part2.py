@@ -9,7 +9,7 @@ def main():
     scorer = Scorer(translator)
     searcher = Searcher(10, 1000, 0.1, scorer)
 
-    start_settings = np.full(10, 0.3)
+    start_settings = np.full(10, 0.5)
 
     start_time = time.perf_counter()
 
