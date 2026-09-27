@@ -52,22 +52,35 @@ class Searcher:
         self.best_pos = np.full(n_dim, np.nan) # best point found across all climbs
         self.best_score = -np.inf
 
-    def __call__(self):
+    def __call__(self, start_settings: np.ndarray):
         if self.has_searched:
             raise LookupError("A searcher can only search once. Create another searcher")
-        
-        
-        while self.num_evals < self.stop_limit:
-            if not self.calibrate():
-                break
-            while self.step_size >= MIN_STEP and self.num_evals < self.stop_limit:
-                self.expand_frontier()
-                if not self.examine_frontier():
-                    break
-                self.take_step()
+
+        # first climb starts from the given point; only escape the plateau if it scores 0
+        start_score = self._score(start_settings)
+        if start_score is not None:
+            if start_score > 0:
+                self._stand_on(start_settings, start_score)
+                started = True
+            else:
+                started = self.calibrate()
+
+            while started:
+                self._climb()
+                started = self.calibrate()   # next restart (replaced in Change 2)
 
         self.has_searched = True
         return self.best_pos, self.best_score
+
+    def _climb(self):
+        '''
+        Hill climbs from curr until step_size drops below MIN_STEP or the budget runs out.
+        '''
+        while self.step_size >= MIN_STEP and self.num_evals < self.stop_limit:
+            self.expand_frontier()
+            if not self.examine_frontier():
+                break
+            self.take_step()
 
     def _score(self, pos):
         '''
@@ -92,12 +105,17 @@ class Searcher:
             if score is None:
                 return False
             if score > 0:
-                self.curr, self.curr_score = candidate, score
-                self.step_size = self.init_step
-                self.seen = np.vstack((self.seen, self.curr))
-                self.seen_scores.append(self.curr_score)
+                self._stand_on(candidate, score)
                 return True
 
+    def _stand_on(self, pos, score):
+        '''
+        Makes pos (already scored) the current point and resets the step size for a new climb.
+        '''
+        self.curr, self.curr_score = np.array(pos, dtype=float), score
+        self.step_size = self.init_step
+        self.seen = np.vstack((self.seen, self.curr))
+        self.seen_scores.append(self.curr_score)
 
     def expand_frontier(self):
         '''+/- step_size on each knob (2*n_dim neighbours), clipped to [0, 1], deduped.'''
@@ -147,7 +165,7 @@ if __name__ == "__main__":
     translator = UniversalTranslator(n_dim=N_DIM)
     scorer = Scorer(translator)
     searcher = Searcher(N_DIM, 3000, 0.1, scorer)
-    best_pos, best_score = searcher()
+    best_pos, best_score = searcher(np.full(N_DIM, 0.5))
     print(f"best settings: {np.round(best_pos, 3)}")
     print(f"best decode rate: {best_score:.4f}")
     print(f"settings tried: {translator.n_settings_tried()}")
