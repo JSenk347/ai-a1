@@ -1,14 +1,30 @@
 from translator import UniversalTranslator
 import numpy as np
+import time
+from searcher import Searcher
+from scoring import Scorer 
+
+def main():
+    translator = UniversalTranslator(n_dim=10)
+    scorer = Scorer(translator)
+    searcher = Searcher(10, 1000, 0.1, scorer)
+
+    start_settings = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+
+    start_time = time.perf_counter()
+
+    best_settings, best_score = searcher(start_settings)
+
+    end_time= time.perf_counter()  
+    full_time = end_time - start_time
+
+    print(f"Best settings = {best_settings}")
+    print(f"Best decode rate = {best_score:.4f}")
+    print(f"Time taken = {full_time:.4f} seconds")
+    print(f"Total number of settings tried = {translator.n_settings_tried()}")
+        
+
+if __name__ == "__main__":
+    main() 
 
 
-# create the UniversalTranslator object, with 10 knobs
-translator = UniversalTranslator(n_dim=10)
-
-# demo of how to use the UniversalTranslator object. You can delete these lines
-random_settings = np.random.random(size=10)
-translated_string = translator.translate(random_settings)
-print(translated_string)
-
-# print total number of settings evaluated
-print(f'# settings tried: {translator.n_settings_tried()}')
