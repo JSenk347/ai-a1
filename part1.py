@@ -13,7 +13,7 @@ def main():
     # Josephs scorer to our translator instance
     scorer = Scorer(translator)
     #searcher = Searcher(n_dim=2, stop_limit=25, step_size=0.1, scorer=scorer)
-    searcher = Searcher(n_dim=2, stop_limit=100, step_size=0.01, scorer=scorer)
+    searcher = Searcher(n_dim=2, stop_limit=100, step_size=0.2, scorer=scorer, patience=50)
 
     start_settings = np.array([0.5, 0.5])
     best_settings, best_score = searcher(start_settings)
