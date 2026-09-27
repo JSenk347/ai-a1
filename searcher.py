@@ -39,8 +39,9 @@ class Searcher:
         self.curr_score = np.nan                # score of curr; nan until curr has been scored
 
         self.frontier = np.empty((0, n_dim))    # shape (k, n_dim): neighbours of curr still worth considering, one per row
+
         self.seen = np.empty((0, n_dim))        # shape (m, n_dim): every point we have stood on, one per row
-        self.seen_scores = []
+        self.seen_scores = []                   #
 
         self.curr_best_pos = np.full(n_dim, np.nan)
 
@@ -55,9 +56,11 @@ class Searcher:
                 self.examine_frontier()
                 self.take_step()
 
+            self.seen_scores.append(self.scorer.best()[1])
+
             self.has_searched = True
   
-            return self.curr, self.scorer.best()[1]
+            return self.curr, self.seen_scores[-1]
         else:
             raise LookupError("A searcher can only climb one hill. Create another searcher to climb another hill.")
 
@@ -121,8 +124,10 @@ class Searcher:
 
 
 if __name__ == "__main__":
-    searcher = Searcher(10, 1000, 0.1)
-    print(searcher(np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5])))
+    translator = UniversalTranslator(n_dim=2)
+    scorer = Scorer(translator)
+    searcher = Searcher(2, 1000, 0.1, scorer)
+    print(searcher(np.array([.5, .5])))
 
 
 
