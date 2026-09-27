@@ -24,7 +24,8 @@ def main():
     print(f"Total Number of Settings Tried: {translator.n_settings_tried()}")
 
     # generating scatter plot for the data provided
-    generate_search_plot(scorer.history)
+    path_history = list(zip(searcher.seen, searcher.seen_scores))
+    generate_search_plot(path_history)
 
 if __name__ == "__main__":
     main()
