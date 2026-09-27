@@ -12,7 +12,8 @@ def main():
 
     # Josephs scorer to our translator instance
     scorer = Scorer(translator)
-    searcher = Searcher(n_dim=2, stop_limit=100 , step_size=0.1, scorer=scorer)
+    #searcher = Searcher(n_dim=2, stop_limit=25, step_size=0.1, scorer=scorer)
+    searcher = Searcher(n_dim=2, stop_limit=100, step_size=0.01, scorer=scorer)
 
     start_settings = np.array([0.5, 0.5])
     best_settings, best_score = searcher(start_settings)
@@ -23,7 +24,7 @@ def main():
     print(f"Total Number of Settings Tried: {translator.n_settings_tried()}")
 
     # generating scatter plot for the data provided
-    generate_search_plot(searcher.path_history) # pass the path history to the plotter function to generate the scatter plot
-    
+    generate_search_plot(scorer.history)
+
 if __name__ == "__main__":
     main()
