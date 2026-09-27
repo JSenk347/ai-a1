@@ -45,6 +45,8 @@ class Searcher:
 
         self.curr_best_pos = np.full(n_dim, np.nan)
 
+        self.path_history = [] # tracker for pos, score pairs for each step in the searcher. This is used for plotting the path taken by the searcher.
+
     def __call__(self, starting_settings: np.ndarray):
         if not self.has_searched:
             self.validate_start(starting_settings)
@@ -94,6 +96,9 @@ class Searcher:
         provided the best score
         '''
         self.curr_score = self.scorer(self.curr)
+
+        self.path_history.append((self.curr.copy(), self.curr_score)) # record the current pos and score we are currently in
+
         best_score = self.curr_score
         self.curr_best_pos = self.curr
 
@@ -129,9 +134,4 @@ if __name__ == "__main__":
     searcher = Searcher(2, 1000, 0.1, scorer)
     print(searcher(np.array([.5, .5])))
 
-
-
-
-        
-
-         
+    
