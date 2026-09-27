@@ -12,6 +12,12 @@ def generate_search_plot(history_list):
     # create a scatter plot of the knob settings and their corresponding scores
     plt.scatter(x_values, y_values, c=scores, vmin=0, vmax=1)
 
+    # auto scale the axes and set limits to ensure all points are visible
+    plt.autoscale(enable=True, axis='both', tight=False)
+    plt.xlim(left=0.0)
+    plt.ylim(bottom=0.0)
+    plt.grid(True)
+
     # add a color bar to indicate the score values
     plt.colorbar(label='Decode Rate')
 
