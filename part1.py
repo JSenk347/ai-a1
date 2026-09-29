@@ -1,3 +1,4 @@
+import time
 from translator import UniversalTranslator
 from plotter import generate_search_plot
 from scoring import Scorer
@@ -16,11 +17,18 @@ def main():
     searcher = Searcher(n_dim=2, stop_limit=100, step_size=0.2, scorer=scorer, patience=50)
 
     start_settings = np.array([0.5, 0.5])
+
+    start_time = time.perf_counter()
+
     best_settings, best_score = searcher(start_settings)
+
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
 
     # print total number of settings evaluated
     print(f"Best Knob Setting Found: {best_settings}")
     print(f"Best Decode Rate Found: {best_score}")
+    print(f"Time taken = {elapsed_time:.4f} seconds")
     print(f"Total Number of Settings Tried: {translator.n_settings_tried()}")
 
     # generating scatter plot for the data provided
