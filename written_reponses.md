@@ -2,6 +2,12 @@ Write your answers to the following questions in this file, *after* completing e
 
 # 1) How many settings must be evaluated to *exhaustively* search for the best set (e.g. through some kind of brute-force search). State your assumptions and explain how you arrived at your answer. How does your solution compare to this (quantitatively)?
 
+- Each knob is continuous on the range of [0,1], so a complete exhaustive search would require an infinite amount of computations. 
+
+- The amount of settings that must be tried to exhaustively search for the best solution set depends on the step size taken so taking only 0.2 steps will result in 6^(number of knobs) possible combinations. 2 knobs would be 36 settigns and 10 knobs would 6^10 so 60.5 million settings. Our searcher starts with 0.2 and our step size shrinks down to 0.005 so matching that resolution would require 201^10 settings
+
+- Our searcher will try at most 10000 settings which amounts to about 0.017% of the 0.2 grid of possible solutions which is around 6000 times fewer evaluations than a brute force ssolutionwould try at 0.2 step size.
+
 
 
 
