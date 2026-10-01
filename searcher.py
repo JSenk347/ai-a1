@@ -48,7 +48,7 @@ class Searcher:
         self.frontier = np.empty((0, n_dim))    # shape (k, n_dim): neighbours of curr still worth considering, one per row
 
         self.seen = np.empty((0, n_dim))        # shape (m, n_dim): every point we have stood on, one per row
-        self.seen_scores = []                   #
+        self.seen_scores = []                   # score of each row in seen
 
         self.curr_best_pos = np.full(n_dim, np.nan)
 
@@ -123,7 +123,7 @@ class Searcher:
 
     def _score(self, pos):
         '''
-        Scores pos, updating the eval count and gloabl best. Returns None if out of budget.
+        Scores pos, updating the eval count and global best. Returns None if out of budget.
         '''
         if self.num_evals >= self.stop_limit:
             return None
@@ -195,8 +195,8 @@ if __name__ == "__main__":
     N_DIM = 10
     translator = UniversalTranslator(n_dim=N_DIM)
     scorer = Scorer(translator)
-    searcher = Searcher(N_DIM, 10000, 0.1, scorer)
-    best_pos, best_score = searcher(np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5]))
+    searcher = Searcher(N_DIM, 10000, 0.2, scorer, patience=50)
+    best_pos, best_score = searcher(np.full(N_DIM, 0.5))
     print(f"best settings: {np.round(best_pos, 3)}")
     print(f"best decode rate: {best_score:.4f}")
     print(f"settings tried: {translator.n_settings_tried()}")

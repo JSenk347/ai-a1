@@ -1,17 +1,15 @@
-import math
-
 class Scorer:
-    '''A scoring class that uses a translator to compute scores for knob settings. 
-    The score is computed by translating the knob settings and counting the number of translated words. 
+    '''A scoring class that uses a translator to compute scores for knob settings.
+    The score is computed by translating the knob settings and counting the number of translated words.
     The score is normalized by the total number of words in the message.'''
     def __init__(self, translator):
 
-        self.translator = translator     
+        self.translator = translator
         self.history = []   # pair of (knobs_setting, score)
-        
-    '''
-    Computes the score for a given knob setting. The score is computed by translating the knob settings'''
+
     def __call__(self, knobs_settings):
+        '''
+        Computes the score for a given knob setting. The score is computed by translating the knob settings'''
 
         knobs_settings = self.check_settings(knobs_settings)
 
@@ -21,22 +19,23 @@ class Scorer:
         self.history.append((knobs_settings, score))
 
         return score
-    
-    '''
-    Computes the best score and the corresponding knob settings from the history of scores.
-    '''
+
     def best(self):
+        '''
+        Computes the best score and the corresponding knob settings from the history of scores.
+        '''
         best_settings, best_score = self.history[0]
-        
+
         for settings, score in self.history:
             if score > best_score:
                 best_settings = settings
                 best_score = score
         return best_settings, best_score
-    '''
-    Checks the validity of the knob settings, if the settings are unvalid it would inflate our attempt count.
-    '''
+
     def check_settings(self, settings):
+        '''
+        Checks the validity of the knob settings, if the settings are invalid it would inflate our attempt count.
+        '''
         our_copy = []
 
         for value in settings:
@@ -49,11 +48,6 @@ class Scorer:
             )
 
         for knob_number, value in enumerate(our_copy):
-            # if math.isnan(value):
-            #     raise ValueError(
-            #         f"knob {knob_number} is not a number"
-            #     )
-
             if value < 0 or value > 1:
                 raise ValueError(
                     f"knob {knob_number} is {value}, "
@@ -61,11 +55,11 @@ class Scorer:
                 )
 
         return our_copy
-    
-'''
-Decodes the message by counting the number of translated words and dividing by words in the coded message.
-'''
+
 def decode(message):
+    '''
+    Decodes the message by counting the number of translated words and dividing by words in the coded message.
+    '''
     words = message.split()
     translated_count = 0
 
