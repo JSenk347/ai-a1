@@ -18,7 +18,7 @@ def main():
     end_time= time.perf_counter()  
     full_time = end_time - start_time
 
-    print(f"Best settings = {best_settings}")
+    print(f"Best settings = [{', '.join(f'{x:.4f}' for x in best_settings)}]")
     print(f"Best decode rate = {best_score:.4f}")
     print(f"Time taken = {full_time:.4f} seconds")
     print(f"Total number of settings tried = {translator.n_settings_tried()}")

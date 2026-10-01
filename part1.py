@@ -24,8 +24,8 @@ def main():
     elapsed_time = end_time - start_time
 
     # print total number of settings evaluated
-    print(f"Best Knob Setting Found: {best_settings}")
-    print(f"Best Decode Rate Found: {best_score}")
+    print(f"Best Knob Setting Found: [{', '.join(f'{x:.4f}' for x in best_settings)}]")
+    print(f"Best Decode Rate Found: {best_score:.4f}")
     print(f"Time taken = {elapsed_time:.4f} seconds")
     print(f"Total Number of Settings Tried: {translator.n_settings_tried()}")
 
