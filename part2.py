@@ -14,7 +14,6 @@ def main():
     start_time = time.perf_counter()
 
     best_settings, best_score = searcher(start_settings)
-    print(best_score)
 
     end_time= time.perf_counter()  
     full_time = end_time - start_time
