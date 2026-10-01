@@ -7,7 +7,7 @@ from scoring import Scorer
 def main():
     translator = UniversalTranslator(n_dim=10)
     scorer = Scorer(translator)
-    searcher = Searcher(10, 50000, 0.2, scorer, patience=100)
+    searcher = Searcher(10, 10000, 0.2, scorer, patience=50)
 
     start_settings = np.full(10, 0.5)
 
